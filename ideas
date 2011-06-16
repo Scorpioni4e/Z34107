@@ -1,0 +1,31 @@
+!!!!!!!!!!!!!!!!!!New idea!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Prog name: Z34107 (zealot) v0.01
+system call hijacking without touching the kernel via ptrace from userspace
+each pid is monitored for system calls and then if readdir is found it's dirent struct
+is modified as to not show the pid of one or more of the attacker's pids, namely
+the backdoor itself. This userspace rootkit will essentially follow each instance of a fork  (via syscall tracing)
+and add a new thread for monitoring the newly acquired pid. in this way, no process is without infection
+the readdir() hack has a number of benefits, for one, virtually no program will be able to see the pid's proc entry
+this includes lsof, ls, ps, top, monitoring software, netstat maybe even could be hit, more on this later. 
+The truly lovely thing about this idea is a.) it doesn't touch kernel space b.) it's easily launched c.)
+it's not blocked on 99.999999999% of all linux setups (probably even grsec)
+
+Design considerations:
+The design should be a thread model based on 1 thread per pid. whilst using shared memory for the HIDE_LIST
+and possibly a do not monitor list, and others.
+
+on an added note:
+there can be a wrapper program to hide all the rootkit user's processes (ie: ./wrap bash) just by doing
+the same method of following forks except that instead of editing the system calls it will simply add the
+pids controled by the attacker to the HIDE_LIST which will essentially be shared memory amongst the monitoring
+threads.
+
+on an added note it may be advisable to have a ptrace(PTRACE_ATTACH, getpid()) wrapper program for the
+rootkit user to have full view of the system, also this wrapper could update the HIDE_LIST with each
+new pid it creates so each newly fork()'d binary launched by the rootkit user will be hidden along
+with the daemon itself.
+
+on another note:
+investigation leads me to be an alternate approach might be to modify the open() function as well. in this way
+we can hide key information from certain systems accessing the /proc system namely netstat. tcpdump and it's 
+variants could be the next target after this to ensure complete stealth :]

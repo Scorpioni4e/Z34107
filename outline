@@ -1,0 +1,18 @@
+Z34107 v0.01 
+Outline:
+->backdoor starts up
+->goes thru the process list, sorts out what to attach to
+->sets itself on the do_not_hit list along with the hidden list
+
+
+
+Functions:
+1 main/init
+system call event handler (for threads)
+thread creator/manager
+process list scanner
+module loader?
+1 function for each abducted syscall :]
+ioctl-> backdoor control interface
+
+process hiding funcs alone:
