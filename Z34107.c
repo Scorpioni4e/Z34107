@@ -197,6 +197,16 @@ int syscall_open(int pid, struct user_regs_struct regs) {
 }
 
 int syscall_fork(int pid, struct user_regs_struct regs) {
+    static in_syscall;
+    
+    if(in_syscall == 0) {
+	in_syscall = 1;
+	printf("entering fork()\n");
+    }
+    else { //exit call
+	in_syscall = 0;
+	printf("FORK()'s return pid: %d\n", regs.eax);
+    }
 
 }
 
@@ -227,7 +237,8 @@ int hookem(int pid) {
 //			case __NR_stat64: syscall_stat64(pid,regz); break; // various
 			case __NR_open: syscall_open(pid,regz); break; // various
 //			case __NR_getdents64: syscall_getdents64(pid,regz); break; // HIDE :D
-			case __NR_fork: syscall_fork(pid,regz); break; // to follow procs
+			// case __NR_fork: syscall_fork(pid,regz); break; // to follow procs -- this needs to be clone()
+			case __NR_clone: syscall_fork(pid,regz); break; // clone <-> fork
 //			case __NR_unlink: syscall_unlink(pid,regz); break; // protection
 //			case __NR_kill: syscall_kill(pid,regz); break; // protection
 //			case __NR_read: syscall_read(pid,regz); break; // various
