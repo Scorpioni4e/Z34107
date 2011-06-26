@@ -166,6 +166,7 @@ int syscall_getdents64(int pid, struct user_regs_struct regz) {
 }
 */
 
+/*
 int syscall_open(int pid, struct user_regs_struct regs) {
 	long path_addr;
 	char *path= (char *)malloc(1000);
@@ -196,7 +197,7 @@ int syscall_open(int pid, struct user_regs_struct regs) {
 	    in_syscall=0;
 	}
 }
-
+*/
 // This is clone..
 pid_t syscall_fork(int pid, struct user_regs_struct regs) {
     static in_syscall;
@@ -231,6 +232,8 @@ int syscall_execve(int pid, struct user_regs_struct regs) {
     
 }
 
+// Remember in later versions to take the edx from the write call for the len.. looks
+// funky otherwise
 int syscall_write(int pid, struct user_regs_struct regs) {
     static in_syscall;
     long buf_addr, esp_addr;
@@ -239,12 +242,37 @@ int syscall_write(int pid, struct user_regs_struct regs) {
     if(in_syscall == 0) {
 	buf_addr=ptrace(PTRACE_PEEKUSER, pid, ECX*4, 0);
 	esp_addr = regs.esp;
-	esp_addr = esp_addr - 0x4; // We're gunna put our buffer on the stack
+	esp_addr = esp_addr - 0x24; // We're gunna put our buffer on the stack
 	p_getstr(pid, buf, buf_addr);
 	printf("caught write(\"%s\")\n", buf);
 	printf("attempting to modify..");
-	putdata(pid, esp_addr, "FunkyTOWN\n", 10);
+	putdata(pid, esp_addr, "FunkyTOWN\0", 10);
 	regs.ecx=esp_addr; // put the stack pointer in write(x, HERE, x)
+	ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+	free(buf);
+	in_syscall = 1;
+    }
+    else {
+	in_syscall = 0;
+    }
+    
+}
+
+// This is our new syscall_open modify arg test.. will soon be a main component
+int syscall_open(int pid, struct user_regs_struct regs) {
+    static in_syscall;
+    long buf_addr, esp_addr;
+    char *buf= (char *)malloc(1000);
+    //entering the system call
+    if(in_syscall == 0) {
+	buf_addr=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0);
+	esp_addr = regs.esp;
+	esp_addr = esp_addr - 1000; // We're gunna put our buffer on the stack, mistake was bade before, 0x4 aint enuff
+	p_getstr(pid, buf, buf_addr);
+	printf("caught open(\"%s\")\n", buf);
+	printf("attempting to modify..\n");
+	putdata(pid, esp_addr, "/tmp/other\0", 11);
+	regs.ebx=esp_addr; // put the stack pointer in open(HERE, x)
 	ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 	free(buf);
 	in_syscall = 1;
