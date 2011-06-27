@@ -39,3 +39,11 @@ calls like for instance OpenSSHd keys? here's an example config file entry:
 *ssh* : /home/pasv/.ssh/authorized_keys2 -> /.our/secret/directory/authorized_keys. Thus it acts as a kind of
 program specific sym/hardlink without the user ever knowing.. any other program accessing the directory wouldn't
 be redirected to the spoof.. Think more onit..
+
+
+next target:
+    open("/proc", O_RDONLY|O_NONBLOCK|O_LARGEFILE|O_DIRECTORY|O_CLOEXEC) = 5
+    fcntl64(5, F_GETFD)                     = 0x1 (flags FD_CLOEXEC)
+    getdents(5, /* 208 entries */, 32768)   = 3764
+getdents modification should allow us to hide processes/our secret dirs :)
+-- check strace's file.c, has a lot of good stuff on dirents
