@@ -47,3 +47,13 @@ next target:
     getdents(5, /* 208 entries */, 32768)   = 3764
 getdents modification should allow us to hide processes/our secret dirs :)
 -- check strace's file.c, has a lot of good stuff on dirents
+
+idea: have per proccess per FD /proc/<pid>/fd/<fd> sniffing, so if say a httpd reads a string like read(sock_fd, "GET /fyadsasdj content:BACKDOOR CMD")
+it will act in a specified way, this will allow for some really crafty ways of getting a C&C interface up, for now im practiciing sniffing
+on the stdin fd but it can obviously be expanded
+
+another idea(s):
+    since im already editing so many system calls why not just make a plugin framework for all this trickery? couldn't be that hard and it 
+    would allow me time to finally make a working base instead of this per-function hackery that is going on lately
+    
+    

