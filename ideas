@@ -51,6 +51,22 @@ getdents modification should allow us to hide processes/our secret dirs :)
 idea: have per proccess per FD /proc/<pid>/fd/<fd> sniffing, so if say a httpd reads a string like read(sock_fd, "GET /fyadsasdj content:BACKDOOR CMD")
 it will act in a specified way, this will allow for some really crafty ways of getting a C&C interface up, for now im practiciing sniffing
 on the stdin fd but it can obviously be expanded
+there is another idea born of the one above. by intercepting the read calls we can also modify them and this gives rise to much more
+stealth if we did so choose to have a per pid per fd C&C scheme. in the above example we could modify out the data we're sending,
+obviously this will make a huge performance hit but it will be limited only to the pids that are effected, we may also have subsequently
+monitor accept/bind calls.. here's the strace output of nc binding to port 31337:
+    socket(PF_INET, SOCK_STREAM, IPPROTO_TCP) = 3
+    setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+    bind(3, {sa_family=AF_INET, sin_port=htons(31337), sin_addr=inet_addr("0.0.0.0")}, 16) = 0
+    listen(3, 1)                            = 0
+    rt_sigaction(SIGALRM, {SIG_IGN, [ALRM], SA_RESTART}, {SIG_DFL, [], 0}, 8) = 0
+    alarm(0)                                = 0
+    rt_sigprocmask(SIG_BLOCK, NULL, [], 8)  = 0
+    accept(3, {sa_family=AF_INET, sin_port=htons(36943), sin_addr=inet_addr("127.0.0.1")}, [16]) = 4
+    getsockname(4, {sa_family=AF_INET, sin_port=htons(31337), sin_addr=inet_addr("127.0.0.1")}, [16]) = 0
+    select(5, [0 4], NULL, NULL, NULL)      = 1 (in [4])
+    read(4, "hi\n", 8192)                   = 3
+this gives us an idea as to what to do... more ideas i get the more I'm thinking that a base program needs to be constructed soon!
 
 another idea(s):
     since im already editing so many system calls why not just make a plugin framework for all this trickery? couldn't be that hard and it 
